@@ -1,0 +1,23 @@
+{
+  "name": "proteinhunt-playwright-framework",
+  "version": "1.0.0",
+  "description": "Playwright JavaScript automation framework for ProteinHunt sub system.",
+  "private": true,
+  "scripts": {
+    "test": "npx playwright test",
+    "test:headed": "npx playwright test --headed",
+    "test:smoke": "npx playwright test --grep @smoke",
+    "test:regression": "npx playwright test --grep @regression",
+    "test:sanity": "npx playwright test --grep @sanity",
+    "test:extent": "npx playwright test",
+    "test:report": "npx playwright show-report reports/html-report",
+    "show:extent": "cmd /c start \"\" \"reports/extent-report/index.html\"",
+    "test:browser": "npx playwright test --project=chromium,firefox,webkit"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^8.0.0",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.1",
+    "playwright-html-reporter": "^0.1.11"
+  }
+}

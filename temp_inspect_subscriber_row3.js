@@ -1,0 +1,23 @@
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  await page.goto('https://testsub.proteinhunt.in/login');
+  await page.fill('[placeholder="Enter your username"]', 'hemanthnalla1@gmail.com');
+  await page.fill('[placeholder="Enter your password"]', 'Rgukt@123');
+  await page.click('button:has-text("Sign in"), button:has-text("Login")');
+  await page.waitForURL(/(dashboard|admin|subscriber|chef)/, { timeout: 30000 });
+  await page.click('text=Subscribers');
+  await page.waitForSelector('button:has-text("View All")', { timeout: 30000 });
+  await page.click('button:has-text("View All")');
+  await page.waitForLoadState('domcontentloaded', { timeout: 30000 });
+  console.log('CURRENT_URL', page.url());
+  const heading = await page.locator('h1, h2, h3').first().innerText().catch(() => 'NO_HEADING');
+  console.log('PAGE_HEADING', heading);
+  const searchInputs = await page.$$('input[placeholder*="Search"], input[placeholder*="search"]');
+  console.log('SEARCH_INPUTS', searchInputs.length);
+  if (searchInputs.length > 0) console.log('SEARCH_HTML', await searchInputs[0].evaluate((n)=>n.outerHTML));
+  const tableCount = await page.$$eval('table', (tables) => tables.map((t) => ({ headers: Array.from(t.querySelectorAll('thead th')).map((h) => h.innerText.trim()).join(' || '), firstRow: t.querySelector('tbody tr')?.innerText.replace(/\n/g, ' | ') || 'NO_ROW' })));
+  console.log(JSON.stringify(tableCount, null, 2));
+  await browser.close();
+})();
