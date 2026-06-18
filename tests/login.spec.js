@@ -31,7 +31,8 @@ test.describe('Login Functionality', () => {
     await loginPage.goto();
     await loginPage.loginWithUsername(users.chef.username, users.chef.password);
     await loginPage.verifyLoginSuccess();
-    await expect(page.locator('text=Dashboard')).toBeVisible();
+    await expect(page).toHaveURL(/\/chef\//);
+    await expect(page.getByRole('link', { name: /meal prep/i })).toBeVisible();
     logger.info('Test complete: Valid Chef login');
   });
 

@@ -4,12 +4,12 @@
   "description": "Playwright JavaScript automation framework for ProteinHunt sub system.",
   "private": true,
   "scripts": {
-    "test": "npx playwright test",
-    "test:headed": "npx playwright test --headed",
-    "test:smoke": "npx playwright test --grep @smoke",
-    "test:regression": "npx playwright test --grep @regression",
-    "test:sanity": "npx playwright test --grep @sanity",
-    "test:extent": "npx playwright test",
+    "test": "node scripts/run-tests-open-extent.js",
+    "test:headed": "node scripts/run-tests-open-extent.js --headed",
+    "test:smoke": "node scripts/run-tests-open-extent.js --grep @smoke",
+    "test:regression": "node scripts/run-tests-open-extent.js --grep @regression",
+    "test:sanity": "node scripts/run-tests-open-extent.js --grep @sanity",
+    "test:extent": "node scripts/run-tests-open-extent.js",
     "test:report": "npx playwright show-report reports/html-report",
     "show:extent": "cmd /c start \"\" \"reports/extent-report/index.html\"",
     "test:browser": "npx playwright test --project=chromium,firefox,webkit"

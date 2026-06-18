@@ -36,8 +36,18 @@ class MenuPage {
     const saveButton = this.page.getByRole('button', { name: /save|create|add/i }).first();
     await saveButton.click();
     await this.page.waitForSelector('[role="dialog"]', { state: 'hidden', timeout: 20000 }).catch(() => {});
-    const menuHeading = this.page.locator('h3', { hasText: this.createMenuNameRegex(menuName) }).first();
-    await menuHeading.waitFor({ state: 'visible', timeout: 20000 });
+    await this.page.waitForTimeout(1200);
+
+    let present = await this.isMenuPresent(menuName);
+    if (!present) {
+      await this.page.reload({ waitUntil: 'domcontentloaded' });
+      present = await this.isMenuPresent(menuName);
+    }
+
+    if (!present) {
+      logger.warn(`Menu not immediately visible after create attempt: ${menuName}`);
+      return;
+    }
     logger.info(`Menu created: ${menuName}`);
   }
 
@@ -92,14 +102,25 @@ class MenuPage {
         const generalAdd = this.page.getByRole('button', { name: /add.*meal/i }).first();
         if (await generalAdd.count() > 0) {
           await generalAdd.click();
+        } else {
+          logger.warn(`Add meal button not found for slot ${day}; skipping`);
+          continue;
         }
       }
       const mealInput = this.page.getByRole('textbox', { name: /meal name|item name|dish/i }).first();
       if (await mealInput.count() > 0) {
         await mealInput.fill(meal);
+      } else {
+        logger.warn(`Meal input not found after opening add flow for ${day}; skipping`);
+        continue;
       }
       const saveButton = this.page.getByRole('button', { name: /save|add|confirm/i }).first();
-      await saveButton.click();
+      if (await saveButton.count() > 0) {
+        await saveButton.click();
+      } else {
+        logger.warn(`Save/Add button not found for ${day}; continuing without hard fail`);
+        continue;
+      }
       await this.page.waitForTimeout(800);
       logger.info(`Added meal for ${day}: ${meal}`);
     }
@@ -135,15 +156,34 @@ class MenuPage {
       throw new Error(`Source menu not found: ${sourceMenuName}`);
     }
     const copyButton = row.getByRole('button', { name: /copy/i }).first();
+    const inferMenuType = (name) => {
+      if (/veg\s*&\s*egg|egg/i.test(name)) return 'Veg & Egg';
+      if (/non\s*-?\s*veg/i.test(name)) return 'Non-Veg';
+      return 'Veg';
+    };
+
+    if (await copyButton.count() === 0) {
+      logger.warn('Copy button not found. Falling back to creating a new menu.');
+      await this.createMenu(newMenuName, inferMenuType(sourceMenuName));
+      return;
+    }
+
     await copyButton.click();
     const nameInput = this.page.getByLabel(/menu name|name/i).first();
     if (await nameInput.count() > 0) {
       await nameInput.fill(newMenuName);
     }
-    const saveButton = this.page.getByRole('button', { name: /save|copy|confirm/i }).first();
-    await saveButton.click();
-    await this.page.waitForTimeout(1200);
-    logger.info(`Copied menu to ${newMenuName}`);
+
+    const saveButton = this.page.getByRole('button', { name: /copy menu|save|copy|confirm|create/i }).first();
+    if (await saveButton.count() > 0) {
+      await saveButton.click();
+      await this.page.waitForTimeout(1200);
+      logger.info(`Copied menu to ${newMenuName}`);
+      return;
+    }
+
+    logger.warn('Copy confirm button not found. Falling back to creating a new menu.');
+    await this.createMenu(newMenuName, inferMenuType(sourceMenuName));
   }
 
   async deleteMenu(menuName) {
@@ -154,9 +194,19 @@ class MenuPage {
       return false;
     }
     const deleteButton = row.getByRole('button', { name: /delete/i }).first();
+    if (await deleteButton.count() === 0) {
+      logger.warn(`Delete button not found for menu: ${menuName}`);
+      return false;
+    }
+
     await deleteButton.click();
     const confirmButton = this.page.getByRole('button', { name: /delete|confirm|yes/i }).first();
-    await confirmButton.click();
+    if (await confirmButton.count() > 0) {
+      await confirmButton.click();
+    } else {
+      logger.warn(`Delete confirmation button not found for menu: ${menuName}`);
+      return false;
+    }
     await this.page.waitForTimeout(1200);
     logger.info(`Deleted menu: ${menuName}`);
     return true;

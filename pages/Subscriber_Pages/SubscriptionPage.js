@@ -10,19 +10,23 @@ class SubscriptionPage {
 
   async verifyLoaded() {
     logger.info('Verifying Subscription page loaded');
-    await this.pageHeading.waitFor({ state: 'visible', timeout: 20000 });
+    const hasHeading = await this.pageHeading.isVisible().catch(() => false);
+    if (!hasHeading) {
+      await this.page.waitForURL(/\/subscription/, { timeout: 20000 });
+      await this.page.getByRole('heading', { name: /subscription overview/i }).first().waitFor({ state: 'visible', timeout: 20000 });
+    }
     logger.info('Subscription page loaded');
   }
 
   async printPlanDetails() {
     logger.action('Printing plan details from Subscription page');
     try {
-      const container = this.page.locator('.subscription-details, .plan-details, section').first();
+      const container = this.page.locator('div:has(h4:has-text("Plan Details"))').first();
       if ((await container.count().catch(() => 0)) === 0) {
         logger.info('Plan details container not found; skipping extraction');
         return '';
       }
-      await container.first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+      await container.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       const text = (await container.first().textContent().catch(() => '') ) || '';
       logger.info(`Plan details snippet: ${text.slice(0, 800)}`);
       return text;
@@ -35,12 +39,12 @@ class SubscriptionPage {
   async printUsageAnalysis() {
     logger.action('Printing usage analysis from Subscription page');
     try {
-      const container = this.page.locator('.usage-analysis, .usage, .analytics').first();
+      const container = this.page.locator('div:has(h4:has-text("Usage Analytics"))').first();
       if ((await container.count().catch(() => 0)) === 0) {
         logger.info('Usage analysis container not found; skipping extraction');
         return '';
       }
-      await container.first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+      await container.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       const text = (await container.first().textContent().catch(() => '') ) || '';
       logger.info(`Usage analysis snippet: ${text.slice(0, 800)}`);
       return text;
@@ -53,12 +57,12 @@ class SubscriptionPage {
   async printDeliverySchedules() {
     logger.action('Printing delivery schedules from Subscription page');
     try {
-      const container = this.page.locator('.delivery-schedule, .schedules, .delivery-days').first();
+      const container = this.page.locator('div:has(h4:has-text("Delivery Schedule"))').first();
       if ((await container.count().catch(() => 0)) === 0) {
         logger.info('Delivery schedules container not found; skipping extraction');
         return '';
       }
-      await container.first().waitFor({ state: 'visible', timeout: 2000 }).catch(() => {});
+      await container.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       const text = (await container.first().textContent().catch(() => '') ) || '';
       logger.info(`Delivery schedules snippet: ${text.slice(0, 800)}`);
       return text;

@@ -194,15 +194,18 @@ class DashboardPage {
 
   async markIndividualDeliveryForUser(username, kitchenName, timeSlotLabel) {
     logger.action(`Marking individual delivery for user: ${username}`);
-    const userEl = this.page.locator('div', { hasText: username }).first();
+    const userEl = this.page.locator('div', { hasText: new RegExp(username, 'i') }).first();
     if (await userEl.count() === 0) {
       logger.warn(`User element not found on dashboard: ${username}`);
       return false;
     }
+
+    await userEl.scrollIntoViewIfNeeded();
+
     // try to open scheduled dropdown near the user
-    const dropdown = userEl.locator('button[aria-haspopup], button:has-text("Scheduled"), .scheduled-dropdown').first();
-    if (await dropdown.count() > 0) {
-      await dropdown.click();
+    const dropdown = userEl.locator('button[role="combobox"], button[aria-haspopup], button:has-text("Scheduled"), .scheduled-dropdown').first();
+    if (await dropdown.count() > 0 && await dropdown.isVisible()) {
+      await dropdown.click({ timeout: 8000 });
       logger.info('Opened user scheduled dropdown');
       const deliverOpt = this.page.locator('text=Delivery').first();
       const skipOpt = this.page.locator('text=Skip').first();
@@ -222,7 +225,8 @@ class DashboardPage {
       logger.warn('No kitchen popup shown after marking individual delivery');
       return false;
     }
-    logger.warn('Scheduled dropdown not found for user');
+
+    logger.warn('Scheduled dropdown not found or not visible for user');
     return false;
   }
 

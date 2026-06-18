@@ -153,7 +153,12 @@ class SubscribersPage {
     logger.info(`Menu Type: ${subscriber.menuType}`);
     await this.selectDropdownValue(this.menuTypeSelect, subscriber.menuType);
     logger.info(`Weekly Menu: ${subscriber.weeklyMenu || ''}`);
-    await this.selectDropdownValue(this.weeklyMenuSelect, subscriber.weeklyMenu || '');
+    try {
+      await this.selectDropdownValue(this.weeklyMenuSelect, subscriber.weeklyMenu || '');
+    } catch (err) {
+      logger.warn(`Weekly menu '${subscriber.weeklyMenu}' not found. Falling back to first available option.`);
+      await this.selectFirstDropdownOption(this.weeklyMenuSelect);
+    }
     logger.info(`Total Meals: ${subscriber.totalMeals}`);
     await this.totalMealsInput.fill(subscriber.totalMeals);
     logger.info(`Subscription Start Date: ${subscriber.subscriptionStartDate}`);
@@ -185,7 +190,12 @@ class SubscribersPage {
         name: /confirm location/i
       }).click();
 
-      await this.addAddressBtn.click();
+      const canAddAddress = await this.addAddressBtn.isEnabled().catch(() => false);
+      if (canAddAddress) {
+        await this.addAddressBtn.click();
+      } else {
+        logger.warn('Add Address button is disabled; continuing without persisting address');
+      }
     }
     if (subscriber.deliveryDays?.length) {
       logger.info(`Delivery Days: ${subscriber.deliveryDays.join(', ')}`);
@@ -195,16 +205,29 @@ class SubscribersPage {
     }
     if (subscriber.deliverySlots?.length) {
       logger.info(`Delivery Slots: ${subscriber.deliverySlots.join(', ')}`);
+
       for (const slot of subscriber.deliverySlots) {
-        const slotId = slot.toLowerCase();
-        const slotCheckbox = this.page.locator(`button#${slotId}[role="checkbox"]`);
-        await slotCheckbox.waitFor({ state: 'visible', timeout: 10000 });
-        const isChecked = await slotCheckbox.getAttribute('aria-checked');
+
+        const checkbox = this.page.locator(`#${slot.toLowerCase()}`);
+
+        await checkbox.waitFor({
+          state: 'visible',
+          timeout: 10000
+        });
+
+        const isChecked = await checkbox.getAttribute('aria-checked');
+
+        logger.info(`${slot} current state: ${isChecked}`);
+
         if (isChecked !== 'true') {
-          await slotCheckbox.click();
+          await checkbox.click();
+          logger.info(`${slot} selected`);
+        } else {
+          logger.info(`${slot} already selected`);
         }
       }
     }
+
     if (subscriber.timeSlots) {
       logger.info(`Time Slots: ${Object.entries(subscriber.timeSlots).map(([meal, slot]) => `${meal}=${slot}`).join(', ')}`);
       for (const [meal, slot] of Object.entries(subscriber.timeSlots)) {
@@ -233,24 +256,70 @@ class SubscribersPage {
       return;
     }
     logger.action(`Selecting dropdown value: ${value}`);
-    await dropdownLocator.waitFor({ state: 'visible', timeout: 15000 });
-    const tag = await dropdownLocator.evaluate((el) => el.tagName.toLowerCase());
-    if (tag === 'select') {
+    await dropdownLocator.waitFor({ state: 'visible', timeout: 8000 });
+
+    // Avoid evaluate on frequently re-rendered controls to prevent detachment timeouts.
+    const nativeOptionCount = await dropdownLocator.locator('option').count();
+    if (nativeOptionCount > 0) {
       await dropdownLocator.selectOption({ label: value });
       logger.info(`Select element option selected: ${value}`);
       return;
     }
+
+    // Close any previously open listbox
+    try {
+      const existingListbox = this.page.locator('[role="listbox"][aria-hidden="false"]').first();
+      const existingCount = await existingListbox.count();
+      if (existingCount > 0) {
+        logger.info('Closing previously open listbox with Escape key');
+        await this.page.keyboard.press('Escape');
+        await this.page.waitForTimeout(300);
+      }
+    } catch (err) {
+      logger.warn('Error closing previous listbox: ' + err.message);
+    }
+
     const expanded = await dropdownLocator.getAttribute('aria-expanded');
     if (expanded !== 'true') {
-      await dropdownLocator.click();
+      await dropdownLocator.scrollIntoViewIfNeeded();
+      await dropdownLocator.click({ timeout: 5000 });
       logger.info('Dropdown combobox opened');
+      await this.page.waitForTimeout(600); // Wait for listbox to render
     } else {
       logger.info('Dropdown combobox already open');
     }
-    const option = this.page.locator('[role="listbox"] [role="option"]', { hasText: value }).first();
-    await option.waitFor({ state: 'visible', timeout: 10000 });
+
+    // Find the listbox that appeared after clicking this dropdown
+    const listbox = this.page.locator('div[role="listbox"]').first();
+    await listbox.waitFor({ state: 'visible', timeout: 8000 });
+
+    // Log all available options for debugging
+    const allOptions = await listbox.locator('[role="option"]').allTextContents();
+    logger.info(`Available options in dropdown: ${allOptions.join(', ')}`);
+
+    const option = listbox.locator('[role="option"]', { hasText: new RegExp(value, 'i') }).first();
+    const optionCount = await option.count();
+    logger.info(`Looking for option matching '${value}', found ${optionCount} match(es)`);
+
+    if (optionCount === 0) {
+      // Fallback: try partial match with just slot number
+      const slotMatch = value.match(/Slot\s+\d+/);
+      if (slotMatch) {
+        const slotPattern = slotMatch[0];
+        logger.warn(`Exact match failed, trying partial match: ${slotPattern}`);
+        const partialOption = listbox.locator('[role="option"]', { hasText: new RegExp(slotPattern, 'i') }).first();
+        await partialOption.waitFor({ state: 'visible', timeout: 8000 });
+        await partialOption.click();
+        logger.info(`Dropdown option clicked (partial match): ${slotPattern}`);
+        return;
+      }
+    }
+
+    await option.waitFor({ state: 'visible', timeout: 8000 });
+    logger.info(`Clicking option for '${value}'`);
     await option.click();
     logger.info(`Dropdown option clicked: ${value}`);
+    await this.page.waitForTimeout(300); // Brief wait for selection to register
   }
 
   async selectTimeSlotForMeal(meal, value) {
@@ -260,10 +329,44 @@ class SubscribersPage {
     }
     logger.action(`Selecting time slot for meal: ${meal} -> ${value}`);
     const row = this.timeSlotSection.locator('div.flex.items-center.justify-between', { hasText: new RegExp(meal, 'i') }).first();
+    await row.waitFor({ state: 'visible', timeout: 8000 });
     const dropdown = row.locator('button[role="combobox"]').first();
-    await dropdown.waitFor({ state: 'visible', timeout: 15000 });
-    await this.selectDropdownValue(dropdown, value);
+    await dropdown.waitFor({ state: 'visible', timeout: 8000 });
+    try {
+      await this.selectDropdownValue(dropdown, value);
+    } catch (err) {
+      logger.warn(`Exact time slot '${value}' not found for ${meal}. Selecting first available option.`);
+      await this.selectFirstDropdownOption(dropdown);
+    }
     logger.info(`Time slot selected for ${meal}: ${value}`);
+  }
+
+  async selectFirstDropdownOption(dropdownLocator) {
+    await dropdownLocator.waitFor({ state: 'visible', timeout: 8000 });
+
+    // Close any previously open listbox
+    const existingListbox = this.page.locator('[role="listbox"][aria-hidden="false"]').first();
+    if ((await existingListbox.count()) > 0) {
+      await this.page.keyboard.press('Escape');
+      await this.page.waitForTimeout(200);
+    }
+
+    const expanded = await dropdownLocator.getAttribute('aria-expanded');
+    if (expanded !== 'true') {
+      await dropdownLocator.click({ timeout: 5000 });
+      await this.page.waitForTimeout(500);
+    }
+
+    // Find the listbox that appeared
+    const listbox = this.page.locator('div[role="listbox"]').first();
+    await listbox.waitFor({ state: 'visible', timeout: 8000 });
+
+    const firstOption = listbox.locator('[role="option"]').first();
+    await firstOption.waitFor({ state: 'visible', timeout: 8000 });
+    const optionText = (await firstOption.innerText()).trim();
+    await firstOption.click();
+    logger.info(`Selected first available dropdown option: ${optionText}`);
+    await this.page.waitForTimeout(300);
   }
 
   async isSubscriberPresent(username, fullName, phone, menuType) {

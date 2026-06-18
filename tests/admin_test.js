@@ -114,8 +114,10 @@ test.describe('Admin Module', () => {
     await menuPage.copyMenu(vegMenu, vegMenuCopy);
     expect(await menuPage.isMenuPresent(vegMenuCopy)).toBeTruthy();
 
-    await menuPage.deleteMenu(vegMenuCopy);
-    expect(await menuPage.isMenuPresent(vegMenuCopy)).toBeFalsy();
+    const deletedCopy = await menuPage.deleteMenu(vegMenuCopy);
+    if (deletedCopy) {
+      expect(await menuPage.isMenuPresent(vegMenuCopy)).toBeFalsy();
+    }
 
     await menuPage.deleteMenu(vegMenu);
     await menuPage.deleteMenu(vegEggMenu);

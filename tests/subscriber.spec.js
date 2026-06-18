@@ -99,7 +99,8 @@ test.describe('Subscriber Module', () => {
     await dashboardPage.navigateToInstruction();
     const instructionPage = new InstructionPage(page);
     await instructionPage.verifyLoaded();
-    const ok = await instructionPage.addInstructions('Please leave the food at the reception. No onions.');
+    const instructionText = `Please leave the food at the reception. No onions. ${Date.now()}`;
+    const ok = await instructionPage.addInstructions(instructionText);
     expect(ok).toBeTruthy();
 
     await dashboardPage.logout();

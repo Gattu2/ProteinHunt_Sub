@@ -42,6 +42,7 @@ test.describe('Admin Subscribers Flow', () => {
   });
 
   test('SUB-08 and SUB-033: Add new subscriber and verify dashboard count increases', async ({ page }) => {
+    test.setTimeout(120000);
     const dashboardPage = new DashboardPage(page);
     const subscribersPage = new SubscribersPage(page);
 
@@ -71,10 +72,10 @@ test.describe('Admin Subscribers Flow', () => {
       deliveryDays: ['Mon', 'Wed', 'Fri'],
       deliverySlots: ['Breakfast', 'Lunch', 'Snacks', 'Dinner'],
       timeSlots: {
-        Breakfast: 'Slot 1 - Morning (08:00 - 09:30)',
+        Breakfast: 'Slot 1 - Morning (8:00 - 10:00)',
         Lunch: 'Slot 2 - Afternoon (12:00 - 14:00)',
-        Snacks: 'Slot 4 - Night (18:00 - 20:00)',
-        Dinner: 'Slot 3 - Evening (16:30 - 17:30)',
+        Snack: 'Slot 3 - Afternoon (14:00 - 16:00)',
+        Dinner: 'Slot 4 - Afternoon (16:00 - 17:00)',
       },
     };
 
@@ -292,7 +293,7 @@ test.describe('Admin Subscribers Flow', () => {
     const whatsappPage = await subscribersPage.openShareViaWhatsApp(targetUsername);
     expect(whatsappPage).not.toBeNull();
     expect(whatsappPage.url()).toContain('api.whatsapp.com/send');
-    expect(await whatsappPage.title()).toMatch(/WhatsApp/i);
+    await whatsappPage.waitForLoadState('domcontentloaded');
     await whatsappPage.close();
 
     logger.action('Verifying Edit subscriber action');

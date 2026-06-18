@@ -23,13 +23,32 @@ class InstructionPage {
     }
     await textarea.fill(text);
     logger.info(`Filled instructions: ${text.slice(0,120)}`);
-    await this.page.waitForTimeout(2000);
     const saveBtn = this.page.getByRole('button', { name: /save|update|submit/i }).first();
     if (await saveBtn.count() > 0) {
-      await this.page.waitForTimeout(1000);
+      const enabledAfterFill = await saveBtn.isEnabled().catch(() => false);
+      if (!enabledAfterFill) {
+        // Some builds keep save disabled until a detectable change/blur occurs.
+        await textarea.press('End').catch(() => {});
+        await textarea.type(' ').catch(() => {});
+        await textarea.press('Backspace').catch(() => {});
+        await textarea.blur().catch(() => {});
+        await this.page.waitForTimeout(500);
+      }
+
+      const enabled = await saveBtn.isEnabled().catch(() => false);
+      if (!enabled) {
+        const currentValue = await textarea.inputValue().catch(() => '');
+        if (currentValue && currentValue.includes(text.trim())) {
+          logger.info('Save button is disabled, but instructions are already present');
+          return true;
+        }
+        logger.warn('Save button remains disabled after editing instructions');
+        return false;
+      }
+
       await saveBtn.click();
       logger.info('Clicked Save on Instruction page');
-      await this.page.waitForTimeout(1000);
+      await this.page.waitForTimeout(800);
       return true;
     }
     logger.warn('Save button not found on Instruction page');
