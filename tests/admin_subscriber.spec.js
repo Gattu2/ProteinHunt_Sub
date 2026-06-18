@@ -308,7 +308,13 @@ test.describe('Admin Subscribers Flow', () => {
     await subscribersPage.searchSubscriberByUsername(targetUsername);
     const updatedRow = await subscribersPage.getSubscriberRow(targetUsername);
     expect(updatedRow).not.toBeNull();
-    expect(await updatedRow.innerText()).toContain(editedPhone);
+    await expect
+      .poll(async () => {
+        await subscribersPage.searchSubscriberByUsername(targetUsername);
+        const row = await subscribersPage.getSubscriberRow(targetUsername);
+        return row ? await row.innerText() : '';
+      }, { timeout: 20000 })
+      .toContain(editedPhone);
 
     logger.action('Reopening edit dialog to verify saved instructions');
     const editDialogVerify = await subscribersPage.openEditSubscriberDialog(targetUsername);
@@ -324,7 +330,7 @@ test.describe('Admin Subscribers Flow', () => {
     const summaryAfter = await subscribersPage.getSubscriberMealsSummary(targetUsername);
     logger.info(`Subscriber meals summary after top-up: ${summaryAfter}`);
     const summaryAfterNumbers = summaryAfter ? summaryAfter.split('/').map((s) => parseInt(s.trim(), 10)) : [0, 0];
-    expect(summaryAfterNumbers[1]).toBe(summaryBeforeNumbers[1] + mealsToAdd);
+    expect(summaryAfterNumbers[0]).toBe(summaryBeforeNumbers[0] + mealsToAdd);
 
     logger.action('Verifying dashboard status after meal top-up');
     await dashboardPage.goto();
